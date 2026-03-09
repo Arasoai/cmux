@@ -4927,6 +4927,7 @@ final class GhosttySurfaceScrollView: NSView {
     private let dropZoneOverlayView: GhosttyFlashOverlayView
     private let notificationRingOverlayView: GhosttyFlashOverlayView
     private let notificationRingLayer: CAShapeLayer
+    private let notificationRingGradientLayer: CAGradientLayer
     private let flashOverlayView: GhosttyFlashOverlayView
     private let flashLayer: CAShapeLayer
     private let keyboardCopyModeBadgeView: GhosttyPassthroughVisualEffectView
@@ -5095,6 +5096,7 @@ final class GhosttySurfaceScrollView: NSView {
         dropZoneOverlayView = GhosttyFlashOverlayView(frame: .zero)
         notificationRingOverlayView = GhosttyFlashOverlayView(frame: .zero)
         notificationRingLayer = CAShapeLayer()
+        notificationRingGradientLayer = CAGradientLayer()
         flashOverlayView = GhosttyFlashOverlayView(frame: .zero)
         flashLayer = CAShapeLayer()
         keyboardCopyModeBadgeView = GhosttyPassthroughVisualEffectView(frame: .zero)
@@ -5143,16 +5145,28 @@ final class GhosttySurfaceScrollView: NSView {
         notificationRingOverlayView.layer?.masksToBounds = false
         notificationRingOverlayView.autoresizingMask = [.width, .height]
         notificationRingLayer.fillColor = NSColor.clear.cgColor
-        notificationRingLayer.strokeColor = NSColor.systemBlue.cgColor
-        notificationRingLayer.lineWidth = 2.5
+        notificationRingLayer.strokeColor = NSColor.white.cgColor
+        notificationRingLayer.lineWidth = 1.5
         notificationRingLayer.lineJoin = .round
         notificationRingLayer.lineCap = .round
-        notificationRingLayer.shadowColor = NSColor.systemBlue.cgColor
-        notificationRingLayer.shadowOpacity = 0.35
-        notificationRingLayer.shadowRadius = 3
-        notificationRingLayer.shadowOffset = .zero
-        notificationRingLayer.opacity = 0
-        notificationRingOverlayView.layer?.addSublayer(notificationRingLayer)
+        // Use gradient layer with shape mask for white-to-silver rotating effect
+        notificationRingGradientLayer.type = .conic
+        notificationRingGradientLayer.colors = [
+            NSColor(white: 1.0, alpha: 0.9).cgColor,
+            NSColor(white: 0.75, alpha: 0.7).cgColor,
+            NSColor(white: 0.85, alpha: 0.5).cgColor,
+            NSColor(white: 1.0, alpha: 0.9).cgColor,
+        ]
+        notificationRingGradientLayer.locations = [0, 0.33, 0.66, 1.0]
+        notificationRingGradientLayer.startPoint = CGPoint(x: 0.5, y: 0.5)
+        notificationRingGradientLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
+        notificationRingGradientLayer.shadowColor = NSColor(white: 0.85, alpha: 1.0).cgColor
+        notificationRingGradientLayer.shadowOpacity = 0.15
+        notificationRingGradientLayer.shadowRadius = 2
+        notificationRingGradientLayer.shadowOffset = .zero
+        notificationRingGradientLayer.opacity = 0
+        notificationRingGradientLayer.mask = notificationRingLayer
+        notificationRingOverlayView.layer?.addSublayer(notificationRingGradientLayer)
         notificationRingOverlayView.isHidden = true
         addSubview(notificationRingOverlayView)
         flashOverlayView.wantsLayer = true
@@ -5160,13 +5174,13 @@ final class GhosttySurfaceScrollView: NSView {
         flashOverlayView.layer?.masksToBounds = false
         flashOverlayView.autoresizingMask = [.width, .height]
         flashLayer.fillColor = NSColor.clear.cgColor
-        flashLayer.strokeColor = NSColor.systemBlue.cgColor
-        flashLayer.lineWidth = 3
+        flashLayer.strokeColor = NSColor(white: 0.85, alpha: 0.8).cgColor
+        flashLayer.lineWidth = 1.5
         flashLayer.lineJoin = .round
         flashLayer.lineCap = .round
-        flashLayer.shadowColor = NSColor.systemBlue.cgColor
-        flashLayer.shadowOpacity = 0.6
-        flashLayer.shadowRadius = 6
+        flashLayer.shadowColor = NSColor(white: 0.85, alpha: 1.0).cgColor
+        flashLayer.shadowOpacity = 0.3
+        flashLayer.shadowRadius = 3
         flashLayer.shadowOffset = .zero
         flashLayer.opacity = 0
         flashOverlayView.layer?.addSublayer(flashLayer)
@@ -5509,13 +5523,27 @@ final class GhosttySurfaceScrollView: NSView {
         let targetHidden = !visible
         let targetOpacity: Float = visible ? 1 : 0
         guard notificationRingOverlayView.isHidden != targetHidden ||
-                notificationRingLayer.opacity != targetOpacity else { return }
+                notificationRingGradientLayer.opacity != targetOpacity else { return }
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         notificationRingOverlayView.isHidden = targetHidden
-        notificationRingLayer.opacity = targetOpacity
+        notificationRingGradientLayer.opacity = targetOpacity
         CATransaction.commit()
+
+        if visible {
+            if notificationRingGradientLayer.animation(forKey: "cmux.ring.rotate") == nil {
+                let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+                rotation.fromValue = 0
+                rotation.toValue = CGFloat.pi * 2
+                rotation.duration = 4.0
+                rotation.repeatCount = .infinity
+                rotation.isRemovedOnCompletion = false
+                notificationRingGradientLayer.add(rotation, forKey: "cmux.ring.rotate")
+            }
+        } else {
+            notificationRingGradientLayer.removeAnimation(forKey: "cmux.ring.rotate")
+        }
     }
 
     func setSearchOverlay(searchState: TerminalSurface.SearchState?) {
@@ -5949,7 +5977,7 @@ final class GhosttySurfaceScrollView: NSView {
     func debugNotificationRingState() -> (isHidden: Bool, opacity: Float) {
         (
             notificationRingOverlayView.isHidden,
-            notificationRingLayer.opacity
+            notificationRingGradientLayer.opacity
         )
     }
 
@@ -6534,9 +6562,11 @@ final class GhosttySurfaceScrollView: NSView {
     }
 
     private func updateNotificationRingPath() {
+        let bounds = notificationRingOverlayView.bounds
+        notificationRingGradientLayer.frame = bounds
         updateOverlayRingPath(
             layer: notificationRingLayer,
-            bounds: notificationRingOverlayView.bounds,
+            bounds: bounds,
             inset: 2,
             radius: 6
         )
