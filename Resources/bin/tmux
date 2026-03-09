@@ -181,18 +181,31 @@ list-panes)
     panes=$(cmux_cmd --json list-panes 2>/dev/null || echo "")
 
     if [[ -n "$format" ]]; then
-        # Pass format via env var to avoid code injection through triple-quotes
-        TMUX_SHIM_FORMAT="$format" echo "$panes" | python3 -c "
+        # Pass format and pane map via env vars to avoid code injection
+        TMUX_SHIM_FORMAT="$format" TMUX_SHIM_PANE_MAP="$PANE_MAP" echo "$panes" | python3 -c "
 import sys, json, os
 fmt = os.environ.get('TMUX_SHIM_FORMAT', '')
+pane_map_path = os.environ.get('TMUX_SHIM_PANE_MAP', '')
 try:
     data = json.load(sys.stdin)
 except (json.JSONDecodeError, ValueError):
     sys.exit(0)
+# Build reverse map: cmux surface ref -> tmux pane ID
+rev = {}
+if pane_map_path:
+    try:
+        for line in open(pane_map_path):
+            line = line.strip()
+            if '=' in line:
+                tid, sref = line.split('=', 1)
+                rev[sref] = tid
+    except FileNotFoundError:
+        pass
 panes = data if isinstance(data, list) else []
 for i, p in enumerate(panes):
     line = fmt
-    pane_id = '%' + str(i)
+    sref = p.get('surface_ref', p.get('id', ''))
+    pane_id = rev.get(sref, '%' + str(i))
     line = line.replace('#{pane_id}', pane_id)
     line = line.replace('#{pane_index}', str(i))
     line = line.replace('#{pane_width}', str(p.get('width', 80)))
