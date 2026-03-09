@@ -8482,7 +8482,7 @@ private struct SidebarHelpMenuButton: View {
         } label: {
             Image(systemName: "questionmark.circle")
                 .symbolRenderingMode(.monochrome)
-                .font(.system(size: iconSize, weight: .medium))
+                .font(.system(size: iconSize, weight: .regular))
                 .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                 .frame(width: buttonSize, height: buttonSize, alignment: .center)
         }
@@ -9245,7 +9245,7 @@ private struct TabItemView: View {
 
                 if tab.isPinned {
                     Image(systemName: "pin.fill")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 9, weight: .regular))
                         .foregroundColor(activeSecondaryColor(0.8))
                 }
 
@@ -9265,7 +9265,7 @@ private struct TabItemView: View {
                         tabManager.closeWorkspaceWithConfirmation(tab)
                     }) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 9, weight: .regular))
                             .foregroundColor(activeSecondaryColor(0.7))
                     }
                     .buttonStyle(.plain)
@@ -10399,7 +10399,7 @@ private struct SidebarMetadataEntryRow: View {
         if iconRaw.hasPrefix("text:") {
             let value = String(iconRaw.dropFirst("text:".count))
             guard !value.isEmpty else { return nil }
-            return AnyView(Text(value).font(.system(size: 8, weight: .semibold)))
+            return AnyView(Text(value).font(.system(size: 8, weight: .regular)))
         }
         let symbolName: String
         if iconRaw.hasPrefix("sf:") {
@@ -10408,7 +10408,7 @@ private struct SidebarMetadataEntryRow: View {
             symbolName = iconRaw
         }
         guard !symbolName.isEmpty else { return nil }
-        return AnyView(Image(systemName: symbolName).font(.system(size: 8, weight: .medium)))
+        return AnyView(Image(systemName: symbolName).font(.system(size: 8, weight: .regular)))
     }
 
     @ViewBuilder
