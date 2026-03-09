@@ -2390,7 +2390,13 @@ final class TerminalSurface: Identifiable, ObservableObject {
         // Backward-compatible shell integration keys used by existing scripts/tests.
         env["CMUX_PANEL_ID"] = id.uuidString
         env["CMUX_TAB_ID"] = tabId.uuidString
-        env["CMUX_SOCKET_PATH"] = SocketControlSettings.socketPath()
+        let socketPath = SocketControlSettings.socketPath()
+        env["CMUX_SOCKET_PATH"] = socketPath
+
+        // Expose TMUX env var so tools that detect tmux (e.g. Claude Code agent
+        // teams split-pane mode) route through the cmux tmux shim at Resources/bin/tmux.
+        // Format mirrors real tmux: <socket-path>,<pid>,<window-index>
+        env["TMUX"] = "\(socketPath),\(ProcessInfo.processInfo.processIdentifier),0"
         if let bundleId = Bundle.main.bundleIdentifier, !bundleId.isEmpty {
             env["CMUX_BUNDLE_ID"] = bundleId
         }
