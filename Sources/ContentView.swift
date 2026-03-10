@@ -10408,7 +10408,9 @@ private struct SidebarMetadataEntryRow: View {
             symbolName = iconRaw
         }
         guard !symbolName.isEmpty else { return nil }
-        return AnyView(Image(systemName: symbolName).font(.system(size: 8, weight: .regular)))
+        // Use outline variant in sidebar for thinner appearance
+        let sidebarSymbol = symbolName.hasSuffix(".fill") ? String(symbolName.dropLast(".fill".count)) : symbolName
+        return AnyView(Image(systemName: sidebarSymbol).font(.system(size: 8, weight: .regular)))
     }
 
     @ViewBuilder
