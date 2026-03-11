@@ -1,0 +1,48 @@
+name: Sync upstream
+
+on:
+  schedule:
+    # Every day at 07:00 UTC
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync manaflow branch to upstream main
+        run: |
+          git remote add upstream https://github.com/manaflow-ai/cmux.git || true
+          git fetch upstream main
+          git checkout manaflow
+          BEFORE_SHA=$(git rev-parse HEAD)
+          git reset --hard upstream/main
+          git push origin manaflow --force
+          AFTER_SHA=$(git rev-parse HEAD)
+
+          if [ "$BEFORE_SHA" = "$AFTER_SHA" ]; then
+            echo "No new upstream commits."
+          else
+            COMMIT_COUNT=$(git rev-list "$BEFORE_SHA".."$AFTER_SHA" --count)
+            echo "Synced $COMMIT_COUNT new commits from upstream."
+            echo "Before: $BEFORE_SHA"
+            echo "After:  $AFTER_SHA"
+          fi
