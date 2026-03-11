@@ -18,7 +18,6 @@ For UI or behavior changes, include a short demo video (GitHub upload, Loom, or 
 
 ```text
 @claude review
-@coderabbitai review
 @greptile-apps review
 @cubic-dev-ai review
 ```
