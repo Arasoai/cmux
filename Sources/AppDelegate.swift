@@ -8,6 +8,7 @@ import WebKit
 import Combine
 import ObjectiveC.runtime
 
+// MARK: - Finder Service Path Resolution
 enum FinderServicePathResolver {
     private static func canonicalDirectoryPath(_ path: String) -> String {
         guard path.count > 1 else { return path }
