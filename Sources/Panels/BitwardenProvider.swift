@@ -65,9 +65,14 @@ final class BitwardenProvider {
     }
 
     /// Unlock the vault. Returns the session token on success.
+    /// Passes master password via stdin to avoid exposing it in the process table.
     func unlock(masterPassword: String, completion: @escaping (String?) -> Void) {
         queue.async {
-            let (output, exitCode) = self.runBW(["unlock", "--raw", masterPassword])
+            guard let bwPath = self.findBW() else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            let (output, exitCode) = self.shellWithStdin(bwPath, ["unlock", "--raw", "--passwordenv", "BW_UNLOCK_PW"], stdin: nil, extraEnv: ["BW_UNLOCK_PW": masterPassword])
             if exitCode == 0, !output.isEmpty {
                 let token = output.trimmingCharacters(in: .whitespacesAndNewlines)
                 self.sessionToken = token
@@ -80,7 +85,7 @@ final class BitwardenProvider {
 
     /// Set session token directly (e.g. from env var or user input).
     func setSessionToken(_ token: String) {
-        sessionToken = token
+        queue.async { self.sessionToken = token }
     }
 
     /// Search for credentials matching a domain.
@@ -138,25 +143,39 @@ final class BitwardenProvider {
     }
 
     private func shell(_ executablePath: String, _ arguments: [String]) -> (String, Int32) {
+        return shellWithStdin(executablePath, arguments, stdin: nil, extraEnv: nil)
+    }
+
+    private func shellWithStdin(_ executablePath: String, _ arguments: [String], stdin stdinData: String?, extraEnv: [String: String]?) -> (String, Int32) {
         let process = Process()
-        let pipe = Pipe()
+        let outPipe = Pipe()
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
-        process.standardOutput = pipe
+        process.standardOutput = outPipe
         process.standardError = FileHandle.nullDevice
-        // Build environment: inherit app env + inject BW_SESSION if we have one
         var env = ProcessInfo.processInfo.environment
         env["BITWARDENCLI_APPDATA_DIR"] = nil // Use default
         env["BW_NOINTERACTION"] = "true" // Prevent CLI hangs
         if let token = sessionToken, !token.isEmpty {
             env["BW_SESSION"] = token
         }
+        if let extraEnv {
+            for (key, value) in extraEnv { env[key] = value }
+        }
         process.environment = env
+
+        if let stdinData, let data = stdinData.data(using: .utf8) {
+            let inPipe = Pipe()
+            process.standardInput = inPipe
+            inPipe.fileHandleForWriting.write(data)
+            inPipe.fileHandleForWriting.closeFile()
+        }
 
         do {
             try process.run()
+            // Read stdout BEFORE waitUntilExit to avoid pipe buffer deadlock
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
             let output = String(data: data, encoding: .utf8) ?? ""
             return (output, process.terminationStatus)
         } catch {
@@ -165,7 +184,6 @@ final class BitwardenProvider {
     }
 
     /// Session token file path (~/.config/cmux/bw-session).
-    /// Written by user or by `cmux bw-unlock`, read by the app at runtime.
     private static let sessionTokenFilePath: String = {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         return "\(home)/.config/cmux/bw-session"
@@ -186,9 +204,12 @@ final class BitwardenProvider {
             let token = fileToken.trimmingCharacters(in: .whitespacesAndNewlines)
             if !token.isEmpty { return token }
         }
-        // 3. Try user's login shell
+        // 3. Try user's login shell (pass as executable, not interpolated into command string)
         let shellPath = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let (output, exitCode) = shell("/bin/sh", ["-c", "\(shellPath) -ilc 'echo $BW_SESSION' 2>/dev/null"])
+        guard shellPath.hasPrefix("/"), FileManager.default.isExecutableFile(atPath: shellPath) else {
+            return nil
+        }
+        let (output, exitCode) = shell(shellPath, ["-ilc", "echo $BW_SESSION"])
         if exitCode == 0 {
             let token = output.trimmingCharacters(in: .whitespacesAndNewlines)
             if !token.isEmpty { return token }

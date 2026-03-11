@@ -1701,28 +1701,38 @@ final class BrowserPanel: Panel, ObservableObject {
     /// Cached credentials for the current domain (nil = not yet queried).
     private var cachedCredentials: [BitwardenCredential]?
     private var cachedCredentialsDomain: String?
+    /// Tracks whether we already auto-filled for the current domain (prevents fill loops).
+    private var hasFilledForDomain: String?
 
     /// Called by the JS form detection script when a login form is found.
     func handleLoginFormDetected(domain: String) {
         NSLog("BrowserPanel: login form detected for domain=%@", domain)
         loginFormDetected = true
 
-        // Auto-fill if we have exactly one match
+        // Skip if we already filled for this domain (prevents MutationObserver fill loop)
+        if hasFilledForDomain == domain { return }
+
+        // Use cache if we already queried this domain
         guard cachedCredentialsDomain != domain else {
             if let creds = cachedCredentials, creds.count == 1 {
                 fillCredential(creds[0])
+                hasFilledForDomain = domain
             }
             return
         }
 
         cachedCredentialsDomain = domain
         cachedCredentials = nil
+        let requestDomain = domain
 
         BitwardenProvider.shared.searchCredentials(domain: domain) { [weak self] credentials in
             guard let self else { return }
+            // Discard result if user navigated away (prevents wrong-domain fill)
+            guard self.cachedCredentialsDomain == requestDomain else { return }
             self.cachedCredentials = credentials
             if credentials.count == 1 {
                 self.fillCredential(credentials[0])
+                self.hasFilledForDomain = requestDomain
             } else if credentials.count > 1 {
                 self.shouldShowCredentialPicker = true
             }
@@ -2034,12 +2044,13 @@ final class BrowserPanel: Panel, ObservableObject {
             )
         )
 
-        // Inject credential form detection script at document end so DOM is ready.
+        // Inject credential form detection script at document end (main frame only
+        // to prevent cross-origin iframes from triggering credential lookups).
         config.userContentController.addUserScript(
             WKUserScript(
                 source: CredentialFormJavaScript.formDetectionScript,
                 injectionTime: .atDocumentEnd,
-                forMainFrameOnly: false
+                forMainFrameOnly: true
             )
         )
 
@@ -2107,6 +2118,7 @@ final class BrowserPanel: Panel, ObservableObject {
                 self?.shouldShowCredentialPicker = false
                 self?.cachedCredentials = nil
                 self?.cachedCredentialsDomain = nil
+                self?.hasFilledForDomain = nil
             }
         }
         navDelegate.didFailNavigation = { [weak self] _, failedURL in
