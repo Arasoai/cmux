@@ -15,6 +15,12 @@
 
 set -euo pipefail
 
+# python3 is required for JSON parsing (split-window, list-panes, new-window).
+if ! command -v python3 &>/dev/null; then
+    echo "cmux tmux shim: python3 is required but not found on PATH" >&2
+    exit 1
+fi
+
 # ── Helpers ──────────────────────────────────────────────────────────
 
 CMUX_CLI="${CMUX_CLI:-cmux}"
@@ -71,7 +77,6 @@ split-window)
     direction="right"
     cwd=""
     shell_cmd=""
-    pane_format=""
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -79,7 +84,7 @@ split-window)
             -v) direction="down"; shift ;;
             -c) cwd="$2"; shift 2 ;;
             -P) shift ;;  # print pane info (we always do)
-            -F) pane_format="$2"; shift 2 ;;  # format string
+            -F) shift 2 ;;  # format string (ignored, always print pane ID)
             -d) shift ;;  # don't switch focus (we handle via cmux)
             -l) shift 2 ;;  # size (ignore for now)
             -p) shift 2 ;;  # percentage (ignore for now)
@@ -181,8 +186,9 @@ list-panes)
     panes=$(cmux_cmd --json list-panes 2>/dev/null || echo "")
 
     if [[ -n "$format" ]]; then
-        # Pass format and pane map via env vars to avoid code injection
-        TMUX_SHIM_FORMAT="$format" TMUX_SHIM_PANE_MAP="$PANE_MAP" echo "$panes" | python3 -c "
+        # Pass format and pane map via env vars to avoid code injection.
+        # Env vars must prefix the python3 command (not echo) so python sees them.
+        echo "$panes" | TMUX_SHIM_FORMAT="$format" TMUX_SHIM_PANE_MAP="$PANE_MAP" python3 -c "
 import sys, json, os
 fmt = os.environ.get('TMUX_SHIM_FORMAT', '')
 pane_map_path = os.environ.get('TMUX_SHIM_PANE_MAP', '')
@@ -266,13 +272,13 @@ display-message)
     done
 
     if [[ "$print_mode" == true ]]; then
-        case "$message" in
-            *pane_id*)      echo "%${CMUX_SURFACE_ID:-0}" ;;
-            *session_name*) echo "cmux" ;;
-            *window_index*) echo "0" ;;
-            *pane_index*)   echo "0" ;;
-            *)              echo "$message" ;;
-        esac
+        # Substitute tmux format tokens so combined formats work
+        result="$message"
+        result="${result//\#\{pane_id\}/%${CMUX_SURFACE_ID:-0}}"
+        result="${result//\#\{session_name\}/cmux}"
+        result="${result//\#\{window_index\}/0}"
+        result="${result//\#\{pane_index\}/0}"
+        echo "$result"
     else
         cmux_cmd display-message "$message" 2>/dev/null || echo "$message"
     fi
@@ -280,12 +286,12 @@ display-message)
 
 # ── resize-pane ──────────────────────────────────────────────────────
 resize-pane)
-    target="" direction="-R" amount="5"
+    target="" direction="-R" amount="5" absolute=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -t) target="$2"; shift 2 ;;
-            -x) shift 2 ;;  # absolute width (not directly supported)
-            -y) shift 2 ;;  # absolute height (not directly supported)
+            -x) absolute=true; shift 2 ;;  # absolute width (not supported)
+            -y) absolute=true; shift 2 ;;  # absolute height (not supported)
             -L) direction="-L"; shift ;;
             -R) direction="-R"; shift ;;
             -U) direction="-U"; shift ;;
@@ -295,7 +301,9 @@ resize-pane)
         esac
     done
 
-    if [[ -n "$target" ]]; then
+    if [[ "$absolute" == true ]]; then
+        echo "cmux tmux shim: resize-pane -x/-y (absolute sizing) not supported" >&2
+    elif [[ -n "$target" ]]; then
         surface=$(resolve_pane "$target")
         cmux_cmd resize-pane --pane "$surface" "$direction" --amount "$amount" 2>/dev/null
     fi
@@ -303,7 +311,7 @@ resize-pane)
 
 # ── capture-pane ─────────────────────────────────────────────────────
 capture-pane)
-    target="" print_mode=false scrollback=false
+    target="" print_mode=false
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -t) target="$2"; shift 2 ;;
@@ -326,12 +334,12 @@ capture-pane)
 
 # ── new-window ───────────────────────────────────────────────────────
 new-window)
-    cwd="" shell_cmd="" pane_format=""
+    cwd="" shell_cmd=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -c) cwd="$2"; shift 2 ;;
             -P) shift ;;
-            -F) pane_format="$2"; shift 2 ;;
+            -F) shift 2 ;;  # format string (ignored)
             -n) shift 2 ;;  # window name
             -t) shift 2 ;;  # target
             -d) shift ;;    # don't switch
