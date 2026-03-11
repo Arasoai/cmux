@@ -1690,6 +1690,82 @@ final class BrowserPanel: Panel, ObservableObject {
     /// Incremented whenever async browser find focus ownership changes.
     @Published private(set) var searchFocusRequestGeneration: UInt64 = 0
 
+    // MARK: - Bitwarden Credential Fill
+
+    /// Whether a login form was detected on the current page.
+    @Published private(set) var loginFormDetected: Bool = false
+
+    /// Set to true when multiple credentials are found, signaling the view to auto-show the picker.
+    @Published var shouldShowCredentialPicker: Bool = false
+
+    /// Cached credentials for the current domain (nil = not yet queried).
+    private var cachedCredentials: [BitwardenCredential]?
+    private var cachedCredentialsDomain: String?
+    /// Tracks whether we already auto-filled for the current domain (prevents fill loops).
+    private var hasFilledForDomain: String?
+
+    /// Called by the JS form detection script when a login form is found.
+    func handleLoginFormDetected(domain: String) {
+        NSLog("BrowserPanel: login form detected for domain=%@", domain)
+        loginFormDetected = true
+
+        // Skip if we already filled for this domain (prevents MutationObserver fill loop)
+        if hasFilledForDomain == domain { return }
+
+        // Use cache if we already queried this domain
+        guard cachedCredentialsDomain != domain else {
+            if let creds = cachedCredentials, creds.count == 1 {
+                fillCredential(creds[0])
+                hasFilledForDomain = domain
+            }
+            return
+        }
+
+        cachedCredentialsDomain = domain
+        cachedCredentials = nil
+        let requestDomain = domain
+
+        BitwardenProvider.shared.searchCredentials(domain: domain) { [weak self] credentials in
+            guard let self else { return }
+            // Discard result if user navigated away (prevents wrong-domain fill)
+            guard self.cachedCredentialsDomain == requestDomain else { return }
+            self.cachedCredentials = credentials
+            if credentials.count == 1 {
+                self.fillCredential(credentials[0])
+                self.hasFilledForDomain = requestDomain
+            } else if credentials.count > 1 {
+                self.shouldShowCredentialPicker = true
+            }
+        }
+    }
+
+    /// Fill a credential into the current page's login form.
+    func fillCredential(_ credential: BitwardenCredential) {
+        let js = CredentialFormJavaScript.fillScript(username: credential.username, password: credential.password)
+        webView.evaluateJavaScript(js) { _, error in
+            if let error {
+                NSLog("Credential fill error: %@", error.localizedDescription)
+            }
+        }
+    }
+
+    /// Get cached credentials for the current domain.
+    func getCredentialsForCurrentDomain(completion: @escaping ([BitwardenCredential]) -> Void) {
+        guard let domain = currentURL?.host else {
+            completion([])
+            return
+        }
+        if cachedCredentialsDomain == domain, let cached = cachedCredentials {
+            completion(cached)
+            return
+        }
+        BitwardenProvider.shared.searchCredentials(domain: domain) { [weak self] credentials in
+            self?.cachedCredentials = credentials
+            self?.cachedCredentialsDomain = domain
+            completion(credentials)
+        }
+    }
+
     /// Find-in-page state. Non-nil when the find bar is visible.
     @Published var searchState: BrowserSearchState? = nil {
         didSet {
@@ -1968,6 +2044,16 @@ final class BrowserPanel: Panel, ObservableObject {
             )
         )
 
+        // Inject credential form detection script at document end (main frame only
+        // to prevent cross-origin iframes from triggering credential lookups).
+        config.userContentController.addUserScript(
+            WKUserScript(
+                source: CredentialFormJavaScript.formDetectionScript,
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
+
         let webView = CmuxWebView(frame: .zero, configuration: config)
         webView.allowsBackForwardNavigationGestures = true
         if #available(macOS 13.3, *) {
@@ -1981,6 +2067,9 @@ final class BrowserPanel: Panel, ObservableObject {
         return webView
     }
 
+    /// Message handler helper for credential form detection JS callbacks.
+    private var credentialMessageHandler: CredentialFormMessageHandler?
+
     private func bindWebView(_ webView: CmuxWebView) {
         webView.onContextMenuDownloadStateChanged = { [weak self] downloading in
             if downloading {
@@ -1991,6 +2080,14 @@ final class BrowserPanel: Panel, ObservableObject {
         }
         webView.navigationDelegate = navigationDelegate
         webView.uiDelegate = uiDelegate
+
+        // Register credential form detection message handler
+        let handler = CredentialFormMessageHandler { [weak self] domain in
+            self?.handleLoginFormDetected(domain: domain)
+        }
+        credentialMessageHandler = handler
+        webView.configuration.userContentController.add(handler, name: "cmuxCredentialFormDetected")
+
         setupObservers(for: webView)
     }
 
@@ -2013,6 +2110,15 @@ final class BrowserPanel: Panel, ObservableObject {
                 self?.applyBrowserThemeModeIfNeeded()
                 // Keep find-in-page open through load completion and refresh matches for the new DOM.
                 self?.restoreFindStateAfterNavigation(replaySearch: true)
+            }
+        }
+        navDelegate.didStartNavigation = { [weak self] in
+            Task { @MainActor in
+                self?.loginFormDetected = false
+                self?.shouldShowCredentialPicker = false
+                self?.cachedCredentials = nil
+                self?.cachedCredentialsDomain = nil
+                self?.hasFilledForDomain = nil
             }
         }
         navDelegate.didFailNavigation = { [weak self] _, failedURL in
@@ -2242,6 +2348,8 @@ final class BrowserPanel: Panel, ObservableObject {
         terminatedWebView.stopLoading()
         terminatedWebView.navigationDelegate = nil
         terminatedWebView.uiDelegate = nil
+        terminatedWebView.configuration.userContentController.removeScriptMessageHandler(forName: "cmuxCredentialFormDetected")
+        credentialMessageHandler = nil
         if let terminatedCmuxWebView = terminatedWebView as? CmuxWebView {
             terminatedCmuxWebView.onContextMenuDownloadStateChanged = nil
         }
@@ -4213,6 +4321,7 @@ private class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
     var didFinish: ((WKWebView) -> Void)?
     var didFailNavigation: ((WKWebView, String) -> Void)?
     var didTerminateWebContentProcess: ((WKWebView) -> Void)?
+    var didStartNavigation: (() -> Void)?
     var openInNewTab: ((URL) -> Void)?
     var shouldBlockInsecureHTTPNavigation: ((URL) -> Bool)?
     var handleBlockedInsecureHTTPNavigation: ((URLRequest, BrowserInsecureHTTPNavigationIntent) -> Void)?
@@ -4224,6 +4333,7 @@ private class BrowserNavigationDelegate: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         lastAttemptedURL = webView.url
+        didStartNavigation?()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -4691,6 +4801,30 @@ private class BrowserUIDelegate: NSObject, WKUIDelegate {
             } else {
                 completionHandler(nil)
             }
+        }
+    }
+}
+
+// MARK: - Credential Form Message Handler
+
+/// WKScriptMessageHandler that receives login form detection events from injected JS.
+private class CredentialFormMessageHandler: NSObject, WKScriptMessageHandler {
+    private let onFormDetected: (String) -> Void
+
+    init(onFormDetected: @escaping (String) -> Void) {
+        self.onFormDetected = onFormDetected
+        super.init()
+    }
+
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        guard let body = message.body as? [String: Any],
+              let domain = body["domain"] as? String,
+              !domain.isEmpty else { return }
+        DispatchQueue.main.async {
+            self.onFormDetected(domain)
         }
     }
 }
