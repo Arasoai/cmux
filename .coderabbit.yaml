@@ -1,0 +1,23 @@
+language: "en-US"
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  path_instructions:
+    - path: "Sources/**/*.swift"
+      instructions: >
+        This is a macOS terminal multiplexer app built with Swift/AppKit.
+        Focus on memory management, thread safety, AppKit lifecycle issues,
+        and potential UI freezes from main thread blocking.
+    - path: "ghostty/**"
+      instructions: >
+        This is a git submodule (Ghostty terminal emulator). Changes here
+        are rare and require special submodule workflow. Flag if the
+        submodule pointer changed unexpectedly.
+chat:
+  auto_reply: true

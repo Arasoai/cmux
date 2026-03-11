@@ -17,7 +17,7 @@ For UI or behavior changes, include a short demo video (GitHub upload, Loom, or 
 ## Review Trigger (Copy/Paste as PR comment)
 
 ```text
-@codex review
+@claude review
 @coderabbitai review
 @greptile-apps review
 @cubic-dev-ai review

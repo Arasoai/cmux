@@ -1,0 +1,6 @@
+{
+  "reviewAll": true,
+  "commentTypes": ["logic", "syntax", "style", "checks"],
+  "labels": [],
+  "instructions": "This is cmux, a macOS terminal multiplexer built with Swift/AppKit and Zig (Ghostty). Focus on thread safety, memory management, AppKit main thread issues, and socket API correctness. The ghostty/ directory is a submodule — flag unexpected pointer changes."
+}
