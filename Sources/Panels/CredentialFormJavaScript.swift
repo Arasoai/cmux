@@ -53,24 +53,43 @@ enum CredentialFormJavaScript {
         }
       }
 
-      // Scan on load and on DOM mutations (for multi-step login flows)
+      // Scan on load and on DOM mutations (debounced, stops after first detection)
+      let __cmuxScanTimer = null;
+      let __cmuxDetected = false;
+      function debouncedScan() {
+        if (__cmuxDetected) return;
+        if (__cmuxScanTimer) clearTimeout(__cmuxScanTimer);
+        __cmuxScanTimer = setTimeout(() => {
+          scan();
+          if (detectLoginForm()) { __cmuxDetected = true; observer.disconnect(); }
+        }, 300);
+      }
       scan();
-      const observer = new MutationObserver(() => { scan(); });
-      observer.observe(document.body || document.documentElement, {
-        childList: true, subtree: true
-      });
+      if (detectLoginForm()) { __cmuxDetected = true; }
+      const observer = new MutationObserver(debouncedScan);
+      if (!__cmuxDetected) {
+        observer.observe(document.body || document.documentElement, {
+          childList: true, subtree: true
+        });
+      }
     })()
     """
+
+    /// Escape a string for safe embedding in a JS single-quoted string literal.
+    private static func escapeForJS(_ value: String) -> String {
+        value.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+    }
 
     /// Returns JS that fills a login form with the given credentials.
     /// Uses native setter bypass for React/Vue/Angular compatibility.
     static func fillScript(username: String, password: String) -> String {
-        let escapedUser = username.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\n", with: "\\n")
-        let escapedPass = password.replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "\\'")
-            .replacingOccurrences(of: "\n", with: "\\n")
+        let escapedUser = escapeForJS(username)
+        let escapedPass = escapeForJS(password)
 
         return """
         (() => {
