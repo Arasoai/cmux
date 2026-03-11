@@ -29,6 +29,9 @@
 		A5001402 /* BrowserPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001412 /* BrowserPanel.swift */; };
 		A5001403 /* TerminalPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001413 /* TerminalPanelView.swift */; };
 		A5001404 /* BrowserPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001414 /* BrowserPanelView.swift */; };
+		A5009001 /* SafariAuthSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5009002 /* SafariAuthSessionManager.swift */; };
+		A5009003 /* BitwardenProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5009004 /* BitwardenProvider.swift */; };
+		A5009005 /* CredentialFormJavaScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5009006 /* CredentialFormJavaScript.swift */; };
 		A5001420 /* MarkdownPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001418 /* MarkdownPanel.swift */; };
 		A5001421 /* MarkdownPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5001419 /* MarkdownPanelView.swift */; };
 		A5001290 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = A5001291 /* MarkdownUI */; };
@@ -177,6 +180,9 @@
 		A5001412 /* BrowserPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/BrowserPanel.swift; sourceTree = "<group>"; };
 		A5001413 /* TerminalPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/TerminalPanelView.swift; sourceTree = "<group>"; };
 		A5001414 /* BrowserPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/BrowserPanelView.swift; sourceTree = "<group>"; };
+		A5009002 /* SafariAuthSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/SafariAuthSessionManager.swift; sourceTree = "<group>"; };
+		A5009004 /* BitwardenProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/BitwardenProvider.swift; sourceTree = "<group>"; };
+		A5009006 /* CredentialFormJavaScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/CredentialFormJavaScript.swift; sourceTree = "<group>"; };
 		A5001415 /* PanelContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/PanelContentView.swift; sourceTree = "<group>"; };
 		A5001418 /* MarkdownPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownPanel.swift; sourceTree = "<group>"; };
 		A5001419 /* MarkdownPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Panels/MarkdownPanelView.swift; sourceTree = "<group>"; };
@@ -381,6 +387,9 @@
 				A5001412 /* BrowserPanel.swift */,
 				A5001413 /* TerminalPanelView.swift */,
 				A5001414 /* BrowserPanelView.swift */,
+				A5009002 /* SafariAuthSessionManager.swift */,
+				A5009004 /* BitwardenProvider.swift */,
+				A5009006 /* CredentialFormJavaScript.swift */,
 				A5001418 /* MarkdownPanel.swift */,
 				A5001419 /* MarkdownPanelView.swift */,
 				A5001510 /* CmuxWebView.swift */,
@@ -650,6 +659,9 @@
 				A5001402 /* BrowserPanel.swift in Sources */,
 				A5001403 /* TerminalPanelView.swift in Sources */,
 				A5001404 /* BrowserPanelView.swift in Sources */,
+				A5009001 /* SafariAuthSessionManager.swift in Sources */,
+				A5009003 /* BitwardenProvider.swift in Sources */,
+				A5009005 /* CredentialFormJavaScript.swift in Sources */,
 				A5001420 /* MarkdownPanel.swift in Sources */,
 				A5001421 /* MarkdownPanelView.swift in Sources */,
 				A5001500 /* CmuxWebView.swift in Sources */,

@@ -565,6 +565,7 @@ struct BrowserPanelView: View {
                 .accessibilityLabel("Browser omnibar")
 
             if !panel.isShowingNewTabPage {
+                credentialButton
                 browserThemeModeButton
                 developerToolsButton
             }
@@ -652,6 +653,39 @@ struct BrowserPanelView: View {
                 .padding(.leading, 6)
                 .safeHelp(String(localized: "browser.downloadInProgress", defaultValue: "Download in progress"))
             }
+        }
+    }
+
+    private var credentialButton: some View {
+        Button(action: {
+            if panel.loginFormDetected {
+                panel.getCredentialsForCurrentDomain { credentials in
+                    if credentials.count == 1 {
+                        panel.fillCredential(credentials[0])
+                    } else if credentials.count > 1 {
+                        panel.shouldShowCredentialPicker = true
+                    }
+                }
+            }
+        }) {
+            Image(systemName: "key.fill")
+                .symbolRenderingMode(.monochrome)
+                .cmuxFlatSymbolColorRendering()
+                .font(.system(size: devToolsButtonIconSize, weight: .medium))
+                .foregroundStyle(panel.loginFormDetected
+                    ? Color(nsColor: .controlAccentColor)
+                    : Color(nsColor: .secondaryLabelColor))
+                .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
+        }
+        .buttonStyle(OmnibarAddressButtonStyle())
+        .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
+        .opacity(panel.loginFormDetected ? 1.0 : 0.4)
+        .safeHelp(panel.loginFormDetected
+            ? String(localized: "browser.fillCredentials", defaultValue: "Fill credentials")
+            : String(localized: "browser.noLoginForm", defaultValue: "No login form detected"))
+        .accessibilityIdentifier("BrowserCredentialButton")
+        .popover(isPresented: $panel.shouldShowCredentialPicker) {
+            CredentialPickerView(panel: panel)
         }
     }
 
@@ -4898,5 +4932,65 @@ struct WebViewRepresentable: NSViewRepresentable {
             panelId: panel.id,
             paneId: paneId
         )
+    }
+}
+
+// MARK: - Credential Picker Popover
+
+/// Popover that lists Bitwarden credentials for the current domain.
+private struct CredentialPickerView: View {
+    let panel: BrowserPanel
+    @State private var credentials: [BitwardenCredential] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(String(localized: "credential.loading", defaultValue: "Loading..."))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(12)
+            } else if credentials.isEmpty {
+                Text(String(localized: "credential.noMatches", defaultValue: "No saved credentials found"))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+            } else {
+                ForEach(Array(credentials.enumerated()), id: \.offset) { _, cred in
+                    Button(action: {
+                        panel.fillCredential(cred)
+                        panel.shouldShowCredentialPicker = false
+                    }) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(cred.name)
+                                .font(.system(size: 12, weight: .medium))
+                                .lineLimit(1)
+                            Text(cred.username)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(minWidth: 220)
+        .onAppear {
+            panel.getCredentialsForCurrentDomain { result in
+                credentials = result
+                isLoading = false
+            }
+        }
     }
 }
