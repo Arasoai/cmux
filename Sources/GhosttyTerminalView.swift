@@ -708,6 +708,7 @@ class GhosttyApp {
     private let backgroundLogLock = NSLock()
     private var backgroundLogSequence: UInt64 = 0
     private var appObservers: [NSObjectProtocol] = []
+    private var appearanceObservation: NSKeyValueObservation?
     private var bellAudioSound: NSSound?
     private var backgroundEventCounter: UInt64 = 0
     private var defaultBackgroundUpdateScope: GhosttyDefaultBackgroundUpdateScope = .unscoped
@@ -1001,6 +1002,17 @@ class GhosttyApp {
         #if os(macOS)
         if let app {
             ghostty_app_set_focus(app, NSApp.isActive)
+            // Defer the initial color scheme set to avoid re-entering `shared`
+            // during init — ghostty_app_set_color_scheme triggers action callbacks
+            // that access GhosttyApp.shared, causing a dispatch_once deadlock.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let app = self.app else { return }
+                let scheme = Self.ghosttyColorScheme(for: NSApp?.effectiveAppearance)
+                ghostty_app_set_color_scheme(app, scheme)
+                self.synchronizeThemeWithAppearance(
+                    NSApp?.effectiveAppearance, source: "initialColorScheme"
+                )
+            }
         }
 
         appObservers.append(NotificationCenter.default.addObserver(
@@ -1020,6 +1032,20 @@ class GhosttyApp {
             guard let app = self?.app else { return }
             ghostty_app_set_focus(app, false)
         })
+
+        // Observe NSApp.effectiveAppearance to update the app-level color scheme
+        // and trigger config reloads when the user switches light/dark theme.
+        // This mirrors what upstream Ghostty does in AppDelegate.
+        appearanceObservation = NSApplication.shared.observe(
+            \.effectiveAppearance,
+            options: [.new]
+        ) { [weak self] _, change in
+            guard let self, let app = self.app else { return }
+            guard let appearance = change.newValue else { return }
+            let scheme = Self.ghosttyColorScheme(for: appearance)
+            ghostty_app_set_color_scheme(app, scheme)
+            self.synchronizeThemeWithAppearance(appearance, source: "appAppearanceObserver")
+        }
 
         #endif
     }
@@ -1259,6 +1285,11 @@ class GhosttyApp {
         previousColorScheme != currentColorScheme
     }
 
+    static func ghosttyColorScheme(for appearance: NSAppearance?) -> ghostty_color_scheme_e {
+        let bestMatch = appearance?.bestMatch(from: [.darkAqua, .aqua])
+        return bestMatch == .darkAqua ? GHOSTTY_COLOR_SCHEME_DARK : GHOSTTY_COLOR_SCHEME_LIGHT
+    }
+
     static func shouldCaptureScrollLagEvent(
         samples: Int,
         averageMs: Double,
@@ -1450,6 +1481,12 @@ class GhosttyApp {
             )
         }
         guard shouldReload else { return }
+        // Update the app-level color scheme BEFORE reloading config so that
+        // conditional values (e.g. theme = light:X,dark:Y) resolve correctly.
+        if let app {
+            let scheme = Self.ghosttyColorScheme(for: appearance ?? NSApp?.effectiveAppearance)
+            ghostty_app_set_color_scheme(app, scheme)
+        }
         lastAppearanceColorScheme = currentColorScheme
         reloadConfiguration(source: "appearanceSync:\(source)")
     }
