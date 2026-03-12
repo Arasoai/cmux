@@ -4000,7 +4000,8 @@ struct CMUXCLI {
                 throw CLIError(message: "browser eval requires a script")
             }
             let payload = try client.sendV2(method: "browser.eval", params: ["surface_id": sid, "script": trimmed])
-            output(payload, fallback: "OK")
+            let fallback = displayBrowserValue(payload["value"] ?? NSNull())
+            output(payload, fallback: fallback)
             return
         }
 
@@ -4733,7 +4734,8 @@ struct CMUXCLI {
                 throw CLIError(message: "Unsupported browser console subcommand: \(consoleVerb)")
             }
             let payload = try client.sendV2(method: method, params: ["surface_id": sid])
-            output(payload, fallback: "OK")
+            let fallback = displayBrowserLogItems(payload["items"]) ?? "No console logs"
+            output(payload, fallback: fallback)
             return
         }
 
@@ -4747,7 +4749,8 @@ struct CMUXCLI {
                 throw CLIError(message: "Unsupported browser errors subcommand: \(errorsVerb)")
             }
             let payload = try client.sendV2(method: "browser.errors.list", params: params)
-            output(payload, fallback: "OK")
+            let fallback = displayBrowserLogItems(payload["items"]) ?? "No errors"
+            output(payload, fallback: fallback)
             return
         }
 
@@ -8509,7 +8512,7 @@ struct CMUXCLI {
                 let subtitle = sanitizeNotificationField(completion.subtitle)
                 let body = sanitizeNotificationField(completion.body)
                 let payload = "\(title)|\(subtitle)|\(body)"
-                let response = try client.send(command: "notify_target \(workspaceId) \(surfaceId) \(payload)")
+                let response = try sendV1Command("notify_target \(workspaceId) \(surfaceId) \(payload)", client: client)
                 print(response)
             } else {
                 print("OK")
@@ -8568,7 +8571,7 @@ struct CMUXCLI {
                 )
             }
 
-            let response = try client.send(command: "notify_target \(workspaceId) \(surfaceId) \(payload)")
+            let response = try sendV1Command("notify_target \(workspaceId) \(surfaceId) \(payload)", client: client)
             _ = try? setClaudeStatus(
                 client: client,
                 workspaceId: workspaceId,
