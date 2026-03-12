@@ -1714,9 +1714,13 @@ final class BrowserPanel: Panel, ObservableObject {
 
         // Use cache if we already queried this domain
         guard cachedCredentialsDomain != domain else {
-            if let creds = cachedCredentials, creds.count == 1 {
-                fillCredential(creds[0])
-                hasFilledForDomain = domain
+            if let creds = cachedCredentials {
+                if creds.count == 1 {
+                    fillCredential(creds[0])
+                    hasFilledForDomain = domain
+                } else if creds.count > 1 {
+                    shouldShowCredentialPicker = true
+                }
             }
             return
         }

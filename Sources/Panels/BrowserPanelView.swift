@@ -686,6 +686,7 @@ struct BrowserPanelView: View {
         .accessibilityIdentifier("BrowserCredentialButton")
         .popover(isPresented: $panel.shouldShowCredentialPicker) {
             CredentialPickerView(panel: panel)
+                .environment(\.colorScheme, browserChromeColorScheme)
         }
     }
 
@@ -721,6 +722,7 @@ struct BrowserPanelView: View {
         .frame(width: addressBarButtonSize, height: addressBarButtonSize, alignment: .center)
         .popover(isPresented: $isBrowserThemeMenuPresented, arrowEdge: .bottom) {
             browserThemeModePopover
+                .environment(\.colorScheme, browserChromeColorScheme)
         }
         .safeHelp("Browser Theme: \(browserThemeMode.displayName)")
         .accessibilityIdentifier("BrowserThemeModeButton")
@@ -4979,14 +4981,14 @@ private struct CredentialPickerView: View {
                         .controlSize(.small)
                     Text(String(localized: "credential.loading", defaultValue: "Loading..."))
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                     Spacer()
                 }
                 .padding(12)
             } else if credentials.isEmpty {
                 Text(String(localized: "credential.noMatches", defaultValue: "No saved credentials found"))
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                     .padding(12)
             } else {
                 ForEach(Array(credentials.enumerated()), id: \.offset) { _, cred in
@@ -4997,10 +4999,11 @@ private struct CredentialPickerView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(cred.name)
                                 .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(nsColor: .labelColor))
                                 .lineLimit(1)
                             Text(cred.username)
                                 .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
                                 .lineLimit(1)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
