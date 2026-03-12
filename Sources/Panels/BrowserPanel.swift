@@ -1703,14 +1703,16 @@ final class BrowserPanel: Panel, ObservableObject {
     private var cachedCredentialsDomain: String?
     /// Tracks whether we already auto-filled for the current domain (prevents fill loops).
     private var hasFilledForDomain: String?
+    /// Tracks whether we already showed the credential picker for the current domain.
+    private var hasShownPickerForDomain: String?
 
     /// Called by the JS form detection script when a login form is found.
     func handleLoginFormDetected(domain: String) {
         NSLog("BrowserPanel: login form detected for domain=%@", domain)
         loginFormDetected = true
 
-        // Skip if we already filled for this domain (prevents MutationObserver fill loop)
-        if hasFilledForDomain == domain { return }
+        // Skip if we already handled this domain (prevents MutationObserver loops)
+        if hasFilledForDomain == domain || hasShownPickerForDomain == domain { return }
 
         // Use cache if we already queried this domain
         guard cachedCredentialsDomain != domain else {
@@ -1720,6 +1722,7 @@ final class BrowserPanel: Panel, ObservableObject {
                     hasFilledForDomain = domain
                 } else if creds.count > 1 {
                     shouldShowCredentialPicker = true
+                    hasShownPickerForDomain = domain
                 }
             }
             return
@@ -1739,6 +1742,7 @@ final class BrowserPanel: Panel, ObservableObject {
                 self.hasFilledForDomain = requestDomain
             } else if credentials.count > 1 {
                 self.shouldShowCredentialPicker = true
+                self.hasShownPickerForDomain = requestDomain
             }
         }
     }
@@ -2123,6 +2127,7 @@ final class BrowserPanel: Panel, ObservableObject {
                 self?.cachedCredentials = nil
                 self?.cachedCredentialsDomain = nil
                 self?.hasFilledForDomain = nil
+                self?.hasShownPickerForDomain = nil
             }
         }
         navDelegate.didFailNavigation = { [weak self] _, failedURL in
