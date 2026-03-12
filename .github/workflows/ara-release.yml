@@ -227,6 +227,8 @@ jobs:
             echo "Missing SPARKLE_PRIVATE_KEY secret" >&2
             exit 1
           fi
+          DOWNLOAD_URL_PREFIX="https://github.com/Arasoai/cmux/releases/download/latest/" \
+          RELEASE_NOTES_URL="https://github.com/Arasoai/cmux/releases/tag/latest" \
           ./scripts/sparkle_generate_appcast.sh cmux-ara-edition.dmg latest appcast.xml
 
       - name: Move latest tag
