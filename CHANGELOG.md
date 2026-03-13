@@ -2,6 +2,36 @@
 
 All notable changes to cmux are documented here.
 
+## [0.63.0] - 2026-03-12
+
+### Added
+- SSH remote workspaces with auto SSH forwarding and remote daemon bootstrap ([#239](https://github.com/manaflow-ai/cmux/pull/239))
+- Bitwarden CLI credential auto-fill for browser panes ([#695321f](https://github.com/manaflow-ai/cmux/commit/695321f))
+- Cmd+T (New tab) shortcut on the welcome screen ([#1258](https://github.com/manaflow-ai/cmux/pull/1258))
+- SSH heartbeat status indicator on blank browser tabs
+- SSH copy-error context menu for status-only error workspaces
+
+### Fixed
+- Light theme not applying to terminal content — conditional themes like `theme = light:X,dark:Y` now resolve correctly ([#30e602c](https://github.com/manaflow-ai/cmux/commit/30e602cf))
+- Cmd+backtick window cycling not working ([#2db9bb4](https://github.com/manaflow-ai/cmux/commit/2db9bb4b))
+- Return key not confirming Cmd+Ctrl+W close dialog ([#1279](https://github.com/manaflow-ai/cmux/pull/1279))
+- Pure-style multiline zsh prompt redraws mangling output ([#3c58e8c](https://github.com/manaflow-ai/cmux/commit/3c58e8c5))
+- Titlebar shortcut hint clipping ([#1259](https://github.com/manaflow-ai/cmux/pull/1259))
+- Terminal portals desyncing after sidebar changes ([#1253](https://github.com/manaflow-ai/cmux/pull/1253))
+- Background terminal focus retries reordering windows
+- Credential popover not respecting light/dark theme
+- Sparkle auto-update download URL pointing to wrong repo
+- Browser portal visibility leaking between DEBUG and release builds
+- SSH scrollback lost across split resize
+
+### Changed
+- Website internationalized with 19 languages ([#1216](https://github.com/manaflow-ai/cmux/pull/1216))
+
+### Thanks to 2 contributors!
+
+- [@adisinghstudent](https://github.com/adisinghstudent)
+- [@lawrencecchen](https://github.com/lawrencecchen)
+
 ## [0.62.0] - 2026-03-12
 
 ### Added
