@@ -2,6 +2,12 @@
 
 All notable changes to cmux are documented here.
 
+## [0.63.1] - 2026-03-13
+
+### Fixed
+- Light theme not applying to terminal content on initial launch — conditional themes like `theme = light:X,dark:Y` now resolve correctly at startup
+- Overlay scrollbar knob contrast in light mode
+
 ## [0.63.0] - 2026-03-12
 
 ### Added
