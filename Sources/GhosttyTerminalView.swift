@@ -996,7 +996,10 @@ class GhosttyApp {
         }
 
         // Notify observers that a usable config is available (initial load).
-        lastAppearanceColorScheme = GhosttyConfig.currentColorSchemePreference()
+        // Leave lastAppearanceColorScheme as nil so that the deferred initial
+        // sync below always triggers a config reload — the initial config was
+        // parsed before ghostty_app_set_color_scheme, so conditional themes
+        // (e.g. theme = light:X,dark:Y) resolved with the wrong color scheme.
         NotificationCenter.default.post(name: .ghosttyConfigDidReload, object: nil)
 
         #if os(macOS)
@@ -5911,6 +5914,11 @@ final class GhosttySurfaceScrollView: NSView {
         wantsLayer = true
         layer?.masksToBounds = true
 
+        // Set initial scroller knob style to match the current appearance so the
+        // overlay scrollbar renders with correct contrast in both light and dark themes.
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        scrollView.scrollerKnobStyle = isDark ? .light : .dark
+
         backgroundView.wantsLayer = true
         let initialTerminalBackground = GhosttyApp.shared.defaultBackgroundColor
             .withAlphaComponent(GhosttyApp.shared.defaultBackgroundOpacity)
@@ -6356,6 +6364,17 @@ final class GhosttySurfaceScrollView: NSView {
         if window.isKeyWindow {
             scheduleAutomaticFirstResponderApply(reason: "viewDidMoveToWindow")
         }
+        updateScrollerKnobStyle()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateScrollerKnobStyle()
+    }
+
+    private func updateScrollerKnobStyle() {
+        let isDark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        scrollView.scrollerKnobStyle = isDark ? .light : .dark
     }
 
     func attachSurface(_ terminalSurface: TerminalSurface) {
